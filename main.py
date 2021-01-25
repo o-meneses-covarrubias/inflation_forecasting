@@ -5,10 +5,14 @@ from pandas.api.types import is_string_dtype
 from pandas.api.types import is_numeric_dtype
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.metrics import mean_absolute_error
 
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
+
+    # Preprocessing
+    ########################
 
     # Load data (data is monthly provided by the Federal Reserve Bank of St. Louis). Please see
     # https: // research.stlouisfed.org / econ / mccracken / fred - databases /
@@ -26,7 +30,7 @@ if __name__ == '__main__':
         if prop > 5:
             cols_del.append(col)
 
-    # Delete columns with more than 5$ missing values, for all other take mean or majority vote
+    # Delete columns with more than 5% missing values, for all other take mean or majority vote
     data = data.drop(columns = cols_del)
     cols_replace = [x for x in cols_with_miss if x not in cols_del]
     for col in cols_replace:
@@ -39,9 +43,11 @@ if __name__ == '__main__':
     # Transform cateogorical values using one-hot encoding (only numeric values currently)
     # data = pd.get_dummies(data)
 
-    # Set prediction target to consumer price index (including all items) average incrase for the next 3 months
-    # Introduce 3 month time lag for target
+    # Define prediction target and train/test split
+    ####################################################
 
+    # Set prediction target to consumer price index (including all items) average increase for the next 3 months
+    # Introduce 3 month time lag for target
     y = (data["CPIAUCSL"].shift(periods=-3) / data["CPIAUCSL"] -1) / 3
     # y.plot()
     # Keep y also as feature in the feature table as it is assumed that the inflation of the current month is known
@@ -59,11 +65,26 @@ if __name__ == '__main__':
     features_test = data.loc["2020-01-01":"2020-08-01"]
     y_test = y.loc["2020-01-01":"2020-08-01"]
 
-    features_test["baseline"]
+    # Train random forest
+    ########################
+    from sklearn.ensemble import RandomForestRegressor
 
+    # Instantiate model with 1000 decision trees
+    rf = RandomForestRegressor(n_estimators=1000, random_state=42)
 
-    baseline_errors = abs(baseline_preds - test_labels)
-    print('Average baseline error: ', round(np.mean(baseline_errors), 2))
+    # Train the model on training data
+    rf.fit(features_train, y_train)
+    pred_train = rf.predict(features_train)
+    pred_test = rf.predict(features_test)
+
+    # Evaluate model
+    #############################
+    print(f'The RF on training set has MAE of {round(mean_absolute_error(pred_train, y_train), 4)}')
+    print(f'The RF on test set has MAE of {round(mean_absolute_error(pred_test, y_test), 4)}')
+
+    # See benchmark result
+    print(f'The baseline on train has an MAE of {round(mean_absolute_error(features_train["baseline"], y_train), 4)}')
+    print(f'The baseline on test has an MAE of {round(mean_absolute_error(features_test["baseline"], y_test),4)}')
 
 
 
